@@ -1,6 +1,139 @@
-# 📊 Performance MongoDB vs Supabase - Analyse Comparative
 
-Ce projet est une étude comparative des performances entre **MongoDB** (NoSQL) et **Supabase/PostgreSQL** (SQL) pour le stockage et la récupération de données en temps réel sur la position de l'ISS.
+
+# 📊 Performance PostgreSQL - E-Learning Platform
+
+Ce projet est une étude de performance d'une plateforme e-learning utilisant **PostgreSQL** pour identifier les goulets d'étranglement, analyser les plans d'exécution et mettre en place une stratégie d'optimisation.
+
+---
+
+## 🎯 Objectif Général
+
+Concevoir, analyser et optimiser une base de données PostgreSQL utilisée par une plateforme e-learning afin de :
+
+- Comprendre le fonctionnement interne du moteur PostgreSQL
+- Analyser les plans d'exécution des requêtes
+- Identifier les goulets d'étranglement
+- Mettre en place une stratégie d'indexation pertinente
+- Mesurer objectivement les gains de performance
+
+---
+
+# 📝 Partie 1 — Mise en place de la plateforme
+
+## 1.1 Schéma Relationnel
+
+La base de données gère les entités suivantes :
+
+### Tables à créer
+
+#### 1. **students**
+Table contenant les informations des étudiants inscrits à la plateforme.
+
+**Colonnes** :
+- `student_id` (PK) : Identifiant unique
+- `username` : Nom d'utilisateur (unique)
+- `email` : Adresse email (unique)
+- `first_name` : Prénom
+- `last_name` : Nom
+- `enrollment_date` : Date d'inscription
+- `status` : État du compte (active, inactive, suspended)
+
+#### 2. **courses**
+Table contenant les cours disponibles sur la plateforme.
+
+**Colonnes** :
+- `course_id` (PK) : Identifiant unique du cours
+- `course_name` : Nom du cours
+- `description` : Description détaillée
+- `category` : Catégorie du cours
+- `instructor_id` : Identifiant de l'instructeur
+- `created_date` : Date de création
+- `level` : Niveau de difficulté (beginner, intermediate, advanced)
+
+#### 3. **enrollments**
+Table de liaison pour gérer les inscriptions des étudiants aux cours.
+
+**Colonnes** :
+- `enrollment_id` (PK) : Identifiant unique
+- `student_id` (FK) : Référence à students
+- `course_id` (FK) : Référence à courses
+- `enrollment_date` : Date d'inscription au cours
+- `completion_date` : Date de fin (NULL si non complété)
+- `progress` : Progression en pourcentage
+- `grade` : Note finale
+
+#### 4. **access_logs**
+Table des logs d'accès pour suivre l'activité des utilisateurs.
+
+**Colonnes** :
+- `log_id` (PK) : Identifiant unique
+- `student_id` (FK) : Référence à students
+- `course_id` (FK) : Référence à courses
+- `access_timestamp` : Horodatage de l'accès
+- `session_duration` : Durée de la session (en secondes)
+- `ip_address` : Adresse IP
+- `user_agent` : Agent utilisateur
+- `action_type` : Type d'action (login, view, upload, download)
+
+---
+
+## 1.2 Choix des Types de Données
+
+| Colonne | Type PostgreSQL | Justification |
+|---------|-----------------|---------------|
+| `student_id` / `course_id` / `enrollment_id` / `log_id` | `BIGSERIAL` | Identifiants auto-incrémentés, supportent grandes volumétries |
+| `username` / `email` / `first_name` / `last_name` | `VARCHAR(255)` | Texte variable, limite raisonnable |
+| `enrollment_date` / `created_date` / `completion_date` | `DATE` | Dates sans heure |
+| `access_timestamp` | `TIMESTAMP WITH TIME ZONE` | Horodatage précis et fuseau horaire |
+| `progress` / `grade` | `NUMERIC(5, 2)` | Valeurs décimales précises |
+| `session_duration` | `INTEGER` | Secondes (nombre entier) |
+| `status` / `level` / `category` / `action_type` | `VARCHAR(50)` | Énumérations textuelles |
+
+---
+
+## 1.3 Méthode de Génération des Données
+
+Les données sont générées automatiquement avec les volumétries suivantes :
+
+| Table | Volume | Justification |
+|-------|--------|---------------|
+| `students` | 200 000 | Représente une user base réaliste |
+| `courses` | 1 000 | Nombre modéré de cours |
+| `enrollments` | 2 000 000 | ~10 inscriptions par étudiant en moyenne |
+| `access_logs` | 5 000 000 | ~2-3 accès par inscription (requêtes coûteuses) |
+
+**Approche** :
+- Utilisation de boucles PL/pgSQL pour générer les données
+- Données réalistes : dates cohérentes, ID valides, distributions aléatoires
+- Chargement par batch pour optimiser les performances d'insertion
+
+---
+
+## 1.4 Vérifications Effectuées
+
+### ✅ Cohérence des données
+
+- Clés étrangères : Tous les `student_id` et `course_id` dans `enrollments` et `access_logs` existent dans leurs tables respectives
+- Intégrité temporelle : `completion_date >= enrollment_date` dans enrollments
+- Contraintes uniques : `username` et `email` uniques dans `students`
+
+### ✅ Taille disque
+
+Estimation avant génération :
+```
+students (200K rows)      : ~50 MB
+courses (1K rows)         : ~2 MB
+enrollments (2M rows)     : ~500 MB
+access_logs (5M rows)     : ~1.5 GB
+─────────────────────────────────
+Total                     : ~2.1 GB
+```
+
+### ✅ Temps de chargement
+
+- Génération et insertion des données : < 10 minutes
+- Création des index : < 5 minutes
+- Total : ~15 minutes
 
 ---
 
